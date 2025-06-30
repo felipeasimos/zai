@@ -63,6 +63,8 @@ pub fn build(b: *std.Build) void {
         .with_implot = true,
     });
 
+    lib.root_module.addImport("tensor", tensor.module("tensor"));
+
     exe.root_module.addImport("zglfw", zglfw.module("root"));
     exe.root_module.addImport("zgpu", zgpu.module("root"));
     exe.root_module.addImport("zgui", zgui.module("root"));

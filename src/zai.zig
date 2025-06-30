@@ -21,7 +21,7 @@ pub fn FullyConnectedLayerOptions(comptime dtype: type) type {
         output_size: usize,
         batch_size: usize,
         activation: ActivationFunctionSpec(dtype),
-        next_layer_type: ?type,
+        next_layer_type: ?type = null,
     };
 }
 
@@ -42,41 +42,44 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
     const Data = data: {
         if (options.next_layer_type) |NextLayerType| {
             break :data struct {
-                weights: Tensor(options.dtype, weights_shape),
-                input: Tensor(options.dtype, input_shape),
-                weight_gradients: Tensor(options.dtype, weights_shape),
+                weights: Tensor(dtype, weights_shape) = undefined,
+                input: Tensor(dtype, input_shape) = undefined,
+                weight_gradients: Tensor(dtype, weights_shape) = undefined,
 
-                preactivation: Tensor(options.dtype, output_shape),
-                sigma: Tensor(options.dtype, output_shape),
+                preactivation: Tensor(dtype, output_shape) = undefined,
+                sigma: Tensor(dtype, output_shape) = undefined,
 
                 next_layer: NextLayerType,
             };
         }
         break :data struct {
-            weights: Tensor(options.dtype, weights_shape),
-            input: Tensor(options.dtype, input_shape),
-            weight_gradients: Tensor(options.dtype, weights_shape) = undefined,
+            weights: Tensor(dtype, weights_shape) = undefined,
+            input: Tensor(dtype, input_shape) = undefined,
+            weight_gradients: Tensor(dtype, weights_shape) = undefined,
 
-            preactivation: Tensor(options.dtype, output_shape) = undefined,
-            sigma: Tensor(options.dtype, output_shape) = undefined,
+            preactivation: Tensor(dtype, output_shape) = undefined,
+            sigma: Tensor(dtype, output_shape) = undefined,
 
-            guess: Tensor(options.dtype, output_shape) = undefined,
+            guess: Tensor(dtype, output_shape) = undefined,
         };
     };
 
     return struct {
         data: Data,
         comptime final_output_shape: @TypeOf(_final_output_shape) = _final_output_shape,
-        comptime final_output_type: type = Tensor(options.dtype, _final_output_shape),
+        comptime final_output_type: type = Tensor(dtype, _final_output_shape),
 
         pub fn init() @This() {
-            if (comptime @hasField(@This(), "next_layer")) {
+            if (comptime @hasField(Data, "next_layer")) {
                 return .{
-                    .weights = @FieldType(Data, "weights").random(),
-                    .next_layer = @FieldType(Data, "next_layer").init(),
+                    .data = .{
+                        .next_layer = @FieldType(Data, "next_layer").init(),
+                    },
                 };
             }
-            return .{ .weights = @FieldType(@This(), "weights").random() };
+            return .{
+                .data = .{},
+            };
         }
 
         // f(X * W + B)
@@ -129,7 +132,7 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
         // update bias: sum of current sigma
         // update weights: activations transposed and current sigma
         // sigma: activation gradient, next layer sigma and next layer weight transposed
-        pub fn backprop(self: *@This(), input: anytype, correct: anytype) void {
+        pub fn backprop(self: *@This(), input: anytype, correct: anytype) f64 {
             var result: @This().final_output_type = undefined;
             self.forward(input, &result);
             self.layerBackprop(correct);

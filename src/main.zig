@@ -7,7 +7,10 @@ const zgui = @import("zgui");
 const zai = @import("zai");
 
 const window_title = "zig-gamedev: minimal zgpu zgui";
-
+fn sigmoid(a: f32) f32 {
+    const n = std.math.clamp(a, -500, 500);
+    return 1 / (1 + std.math.exp(-n));
+}
 pub fn main() !void {
     try zglfw.init();
     defer zglfw.terminate();
@@ -68,6 +71,23 @@ pub fn main() !void {
     defer zgui.backend.deinit();
 
     zgui.getStyle().scaleAllSizes(scale_factor);
+
+    const fully_connected_layer = zai.FullyConnectedLayer(f32, zai.FullyConnectedLayerOptions(f32){
+        .input_size = 64,
+        .output_size = 10,
+        .batch_size = 2,
+        .activation = .{
+            .f = sigmoid,
+            .prime = (struct {
+                pub fn func(a: f32) f32 {
+                    const n = std.math.clamp(a, -500, 500);
+                    return sigmoid(n) * (1 - sigmoid(n));
+                }
+            }).func,
+        },
+        .next_layer_type = null,
+    }).init();
+    @import("std").debug.print("layer: {}\n", .{fully_connected_layer});
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
         zglfw.pollEvents();
