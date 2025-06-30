@@ -4,6 +4,7 @@ const zglfw = @import("zglfw");
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
+const zai = @import("zai");
 
 const window_title = "zig-gamedev: minimal zgpu zgui";
 

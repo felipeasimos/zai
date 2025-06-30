@@ -15,7 +15,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    exe_mod.addImport("zai_lib", lib_mod);
+    exe_mod.addImport("zai", lib_mod);
 
     const lib = b.addLibrary(.{
         .linkage = .static,
@@ -53,6 +53,8 @@ pub fn build(b: *std.Build) void {
         .root_module = exe_mod,
     });
 
+    const contract = b.dependency("contract", .{});
+    const tensor = b.dependency("tensor", .{});
     const zglfw = b.dependency("zglfw", .{});
     const zgpu = b.dependency("zgpu", .{});
     const zgui = b.dependency("zgui", .{
@@ -64,6 +66,8 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("zglfw", zglfw.module("root"));
     exe.root_module.addImport("zgpu", zgpu.module("root"));
     exe.root_module.addImport("zgui", zgui.module("root"));
+    exe.root_module.addImport("tensor", tensor.module("tensor"));
+    exe.root_module.addImport("contract", contract.module("contract"));
 
     @import("zgpu").addLibraryPathsTo(exe);
 

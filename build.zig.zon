@@ -24,7 +24,7 @@
     // original project's identity. Thus it is recommended to leave the comment
     // on the following line intact, so that it shows up in code reviews that
     // modify the field.
-    .fingerprint = 0xeabf5fe65b18cce9, // Changing this has security and trust implications.
+    .fingerprint = 0xeeafb78e921f8529, // Changing this has security and trust implications.
 
     // Tracks the earliest Zig version that the package considers to be a
     // supported use case.
@@ -47,6 +47,9 @@
         .zgui = .{
             .url = "https://github.com/zig-gamedev/zgui/archive/ec1372b6ca7ca0cfd187fc93c5d64878271ba608.tar.gz",
             .hash = "zgui-0.6.0-dev--L6sZIWbaADnz0Nsywh4rzg-H2ZqWn6m_1mNWjaKLlBQ",
+        },
+        .tensor = .{
+            .path = "../tensor.zig/",
         },
         .dawn_x86_64_windows_gnu = .{
             .url = "https://github.com/michal-z/webgpu_dawn-x86_64-windows-gnu/archive/d3a68014e6b6b53fd330a0ccba99e4dcfffddae5.tar.gz",
@@ -72,6 +75,14 @@
             .url = "https://github.com/michal-z/webgpu_dawn-x86_64-macos/archive/901716b10b31ce3e0d3fe479326b41e91d59c661.tar.gz",
             .hash = "N-V-__8AAIz1QAKx8C8vft2YoHjGTjEAkH2QMR2UiAo8xZJ-",
             .lazy = true,
+        },
+        .contract = .{
+            .url = "git+https://github.com/felipeasimos/contract.zig.git#35dc378830d422b893af4720e753d0f9ef1b278e",
+            .hash = "contract-0.0.0-Re9wpI0iAAC6iI7CEDhrCXzglGvnIXfMBPYzRajaa6jc",
+        },
+        .zcsv = .{
+            .url = "git+https://github.com/matthewtolman/zig_csv.git#06b18644ef293b9b2def9885a9b460026fc420c4",
+            .hash = "zcsv-0.8.0-Wao6Fl2sAgCxu_ObEjjK9KTD1yp8e4KDUpNMKFJNU7D8",
         },
     },
     .paths = .{
