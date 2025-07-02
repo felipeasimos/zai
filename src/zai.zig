@@ -8,22 +8,17 @@ pub fn TrainingParams(comptime dtype: type) type {
     };
 }
 
-pub fn ActivationFunctionSpec(comptime dtype: type) type {
-    return struct {
-        f: fn (dtype) dtype,
-        prime: fn (dtype) dtype,
-    };
-}
-
-pub fn FullyConnectedLayerOptions(comptime dtype: type) type {
-    return struct {
-        input_size: usize,
-        output_size: usize,
-        batch_size: usize,
-        activation: ActivationFunctionSpec(dtype),
-        next_layer_type: ?type = null,
-    };
-}
+pub const FullyConnectedLayerOptions = struct {
+    input_size: usize,
+    output_size: usize,
+    batch_size: usize,
+    dtype: type,
+    activation: struct {
+        f: fn (anytype) void,
+        prime: fn (anytype) void,
+    },
+    next_layer_type: ?type = null,
+};
 
 fn getComptimeFieldValue(comptime T: type, comptime field_name: []const u8) ?@FieldType(T, field_name) {
     const type_info = @typeInfo(T);
@@ -37,7 +32,8 @@ fn getComptimeFieldValue(comptime T: type, comptime field_name: []const u8) ?@Fi
     return null;
 }
 
-pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnectedLayerOptions(dtype)) type {
+pub fn FullyConnectedLayer(comptime options: FullyConnectedLayerOptions) type {
+    const dtype = options.dtype;
     const weights_shape: [2]usize = .{ options.input_size, options.output_size };
     // const bias_shape = .{options.output_size};
     const input_shape = .{ options.batch_size, options.input_size };
@@ -122,20 +118,17 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
             self.data.input.copy(input);
             var output = input.matmulNew(&self.data.weights); // X * W
             self.data.preactivation.copy(&output); // save Z
-            output.apply(options.activation.f); // output = A = f(Z)
-
+            // output = A = f(Z)
+            for (0..options.batch_size) |row| {
+                var mut = output.mut(.{row});
+                options.activation.f(&mut);
+            }
             if (comptime !is_final_layer) {
                 self.data.next_layer.forward(&output, result);
             }
         }
 
         pub fn layerBackprop(self: *@This(), guess: anytype, correct: anytype) dtype {
-            // update gradients by multiplying a^t and matrix multiplying by sigma
-            defer {
-                self.data.input
-                    .transpose(.{})
-                    .matmul(&self.data.sigma, &self.data.weight_gradients);
-            }
             var loss: dtype = 0;
             // sigma[i] = dL/dZ[i+1] = (sigma[i+1] @ W[i+1]) * dA[i+1]/dZ[i+1]
             // if i == o: sigma = -(y-ŷ) * dA[i+1]/dZ[i+1]
@@ -147,18 +140,20 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
                         return a - b;
                     }
                 }).func);
-                self.data.sigma.wise(&self.data.preactivation, &self.data.sigma, (struct {
+                var tmp: @TypeOf(self.data.preactivation) = undefined;
+                for (0..options.batch_size) |row| {
+                    var mut = tmp.mut(.{row});
+                    mut.copy(self.data.preactivation.view(.{row}));
+                    options.activation.f(&mut);
+                }
+                self.data.sigma.wise(&tmp, &self.data.sigma, (struct {
                     pub fn func(loss_gradient: dtype, z: dtype) dtype {
-                        return loss_gradient * options.activation.prime(z);
+                        return loss_gradient * z;
                     }
                 }).func);
 
                 // calculate loss
                 var sum: dtype = 0;
-                // @compileLog(correct.data.len);
-                // @compileLog(guess.data.len);
-                // @compileLog(correct.shape);
-                // @compileLog(guess.shape);
                 for (correct.data, guess.data) |d, g| {
                     const diff = d - g;
                     sum += diff * diff;
@@ -167,13 +162,23 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
             } else {
                 // calculate sigma
                 self.data.next_layer.data.sigma.matmul(&self.data.next_layer.data.weights.transpose(.{}), &self.data.sigma);
-                self.data.sigma.wise(&self.data.preactivation, &self.data.sigma, (struct {
+                var tmp: @TypeOf(self.data.preactivation) = undefined;
+                for (0..options.batch_size) |row| {
+                    var mut = tmp.mut(.{row});
+                    mut.copy(self.data.preactivation.view(.{row}));
+                    options.activation.f(&mut);
+                }
+                self.data.sigma.wise(&tmp, &self.data.sigma, (struct {
                     pub fn func(z: dtype, sigma: dtype) dtype {
-                        return sigma * options.activation.prime(z);
+                        return sigma * z;
                     }
                 }).func);
                 loss = self.data.next_layer.layerBackprop(guess, correct);
             }
+            // update gradients by multiplying a^t and matrix multiplying by sigma
+            self.data.input
+                .transpose(.{})
+                .matmul(&self.data.sigma, &self.data.weight_gradients);
 
             return loss;
         }

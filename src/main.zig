@@ -12,19 +12,36 @@ const mnist = @embedFile("mnist-mini-csv");
 const dtype = f32;
 
 const window_title = "zig-gamedev: minimal zgpu zgui";
-fn sigmoid(a: dtype) dtype {
-    const n = std.math.clamp(a, -500, 500);
+
+fn sigmoidPure(d: dtype) dtype {
+    const n = std.math.clamp(d, -500, 500);
     return 1 / (1 + std.math.exp(-n));
 }
-fn sigmoidPrime(a: dtype) dtype {
-    const n = std.math.clamp(a, -500, 500);
-    return sigmoid(n) * (1 - sigmoid(n));
+
+fn sigmoid(a: anytype) void {
+    a.apply(sigmoidPure);
 }
-fn relu(a: dtype) dtype {
-    return @max(a, 0);
+fn sigmoidPrime(a: anytype) void {
+    a.apply((struct {
+        pub fn func(d: dtype) dtype {
+            const n = std.math.clamp(d, -500, 500);
+            return sigmoid(n) * (1 - sigmoid(n));
+        }
+    }).func);
 }
-fn reluPrime(a: dtype) dtype {
-    return if (a > 0) 1 else 0;
+fn relu(a: anytype) void {
+    a.apply((struct {
+        pub fn func(d: dtype) dtype {
+            return @max(d, 0);
+        }
+    }).func);
+}
+fn reluPrime(a: anytype) void {
+    a.apply((struct {
+        pub fn func(d: dtype) dtype {
+            return if (d > 0) 1 else 0;
+        }
+    }).func);
 }
 
 fn train() !void {
@@ -34,7 +51,8 @@ fn train() !void {
         std.crypto.random.bytes(std.mem.asBytes(&seed));
         break :blk seed;
     });
-    var fully_connected_layer = zai.FullyConnectedLayer(dtype, zai.FullyConnectedLayerOptions(dtype){
+    var fully_connected_layer = zai.FullyConnectedLayer(zai.FullyConnectedLayerOptions{
+        .dtype = dtype,
         .input_size = 64,
         .output_size = 32,
         .batch_size = 32,
@@ -42,7 +60,8 @@ fn train() !void {
             .f = relu,
             .prime = reluPrime,
         },
-        .next_layer_type = zai.FullyConnectedLayer(dtype, zai.FullyConnectedLayerOptions(dtype){
+        .next_layer_type = zai.FullyConnectedLayer(zai.FullyConnectedLayerOptions{
+            .dtype = dtype,
             .input_size = 32,
             .output_size = 10,
             .batch_size = 32,
