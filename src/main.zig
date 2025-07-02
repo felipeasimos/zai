@@ -1,5 +1,4 @@
 const std = @import("std");
-
 const zglfw = @import("zglfw");
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
@@ -10,42 +9,43 @@ const Tensor = @import("tensor").Tensor;
 
 const mnist = @embedFile("mnist-mini-csv");
 
+const dtype = f32;
+
 const window_title = "zig-gamedev: minimal zgpu zgui";
-fn sigmoid(a: f32) f32 {
+fn sigmoid(a: dtype) dtype {
     const n = std.math.clamp(a, -500, 500);
     return 1 / (1 + std.math.exp(-n));
 }
-fn sigmoidPrime(a: f32) f32 {
+fn sigmoidPrime(a: dtype) dtype {
     const n = std.math.clamp(a, -500, 500);
     return sigmoid(n) * (1 - sigmoid(n));
 }
-fn relu(a: f32) f32 {
+fn relu(a: dtype) dtype {
     return @max(a, 0);
 }
-fn reluPrime(a: f32) f32 {
+fn reluPrime(a: dtype) dtype {
     return if (a > 0) 1 else 0;
 }
 
 fn train() !void {
-    const dtype = f32;
     var parser = zcsv.zero_allocs.slice.init(mnist, .{});
     const seed = 1337;
     var prng = std.Random.DefaultPrng.init(blk: {
         std.crypto.random.bytes(std.mem.asBytes(&seed));
         break :blk seed;
     });
-    var fully_connected_layer = zai.FullyConnectedLayer(f32, zai.FullyConnectedLayerOptions(f32){
+    var fully_connected_layer = zai.FullyConnectedLayer(dtype, zai.FullyConnectedLayerOptions(dtype){
         .input_size = 64,
-        .output_size = 1,
-        .batch_size = 1797,
+        .output_size = 32,
+        .batch_size = 32,
         .activation = .{
             .f = relu,
             .prime = reluPrime,
         },
-        .next_layer_type = zai.FullyConnectedLayer(f32, zai.FullyConnectedLayerOptions(f32){
-            .input_size = 1,
+        .next_layer_type = zai.FullyConnectedLayer(dtype, zai.FullyConnectedLayerOptions(dtype){
+            .input_size = 32,
             .output_size = 10,
-            .batch_size = 1797,
+            .batch_size = 32,
             .activation = .{
                 .f = sigmoid,
                 .prime = sigmoidPrime,
@@ -72,10 +72,10 @@ fn train() !void {
     }
     var loss: f64 = 1;
     i = 0;
-    while (loss > 1e-4) : (i += 1) {
+    while (loss > 1e-4 and i < 3) : (i += 1) {
         @import("std").debug.print("i: {}, loss: {}\n", .{ i, loss });
         loss = fully_connected_layer.train(&x, &y, .{
-            .learning_rate = 1e-3,
+            .learning_rate = 1e-4,
             .random = prng.random(),
         });
     }

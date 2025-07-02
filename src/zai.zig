@@ -1,6 +1,5 @@
 const std = @import("std");
 const Tensor = @import("tensor").Tensor;
-const contract = @import("contract");
 
 pub fn TrainingParams(comptime dtype: type) type {
     return struct {
@@ -156,6 +155,10 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
 
                 // calculate loss
                 var sum: dtype = 0;
+                // @compileLog(correct.data.len);
+                // @compileLog(guess.data.len);
+                // @compileLog(correct.shape);
+                // @compileLog(guess.shape);
                 for (correct.data, guess.data) |d, g| {
                     const diff = d - g;
                     sum += diff * diff;
@@ -192,7 +195,7 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
             }).func);
             self.data.weights.wise(&self.data.weight_gradients, &self.data.weights, (struct {
                 pub fn func(weight: dtype, derivate: dtype) dtype {
-                    return weight * -derivate;
+                    return weight - derivate;
                 }
             }).func);
             if (comptime !is_final_layer) {
@@ -201,15 +204,21 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
         }
 
         pub fn train(self: *@This(), input: anytype, correct: anytype, params: TrainingParams(dtype)) dtype {
-            // const num_samples = input.shape[0];
+            const num_samples = options.batch_size;
 
-            // const idx = params.random.uintLessThan(usize, num_samples);
-            // var data_sample_tmp = input.mut(.{idx});
-            // var data_sample = data_sample_tmp.reshape(.{ 1, data_sample_tmp.shape[0] });
-            // var target_sample_tmp = correct.mut(.{idx});
-            // var target_sample = target_sample_tmp.reshape(.{ 1, target_sample_tmp.shape[0] });
-            // const loss = self.backprop(&data_sample, &target_sample);
-            const loss = self.backprop(input, correct);
+            var batch_x: Tensor(dtype, input_shape) = undefined;
+            var batch_y: Tensor(dtype, self.final_output_shape) = undefined;
+            for (0..num_samples) |i| {
+                const idx = params.random.uintLessThan(usize, num_samples);
+                var data_sample = input.clone(.{idx});
+                var target_sample = correct.clone(.{idx});
+                var batch_x_row = batch_x.mut(.{i});
+                batch_x_row.copy(&data_sample);
+                var batch_y_row = batch_y.mut(.{i});
+                batch_y_row.copy(&target_sample);
+            }
+            const loss = self.backprop(&batch_x, &batch_y);
+            // const loss = self.backprop(input, correct);
             self.layerTrain(params);
             return loss;
         }
