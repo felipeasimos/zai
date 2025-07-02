@@ -49,7 +49,7 @@
             .hash = "zgui-0.6.0-dev--L6sZIWbaADnz0Nsywh4rzg-H2ZqWn6m_1mNWjaKLlBQ",
         },
         .tensor = .{
-            .path = "../tensor.zig/",
+            .path = "../../tensor.zig/",
         },
         .dawn_x86_64_windows_gnu = .{
             .url = "https://github.com/michal-z/webgpu_dawn-x86_64-windows-gnu/archive/d3a68014e6b6b53fd330a0ccba99e4dcfffddae5.tar.gz",

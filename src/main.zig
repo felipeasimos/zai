@@ -36,14 +36,14 @@ fn train() !void {
     });
     var fully_connected_layer = zai.FullyConnectedLayer(f32, zai.FullyConnectedLayerOptions(f32){
         .input_size = 64,
-        .output_size = 16,
+        .output_size = 1,
         .batch_size = 1797,
         .activation = .{
             .f = relu,
             .prime = reluPrime,
         },
         .next_layer_type = zai.FullyConnectedLayer(f32, zai.FullyConnectedLayerOptions(f32){
-            .input_size = 16,
+            .input_size = 1,
             .output_size = 10,
             .batch_size = 1797,
             .activation = .{

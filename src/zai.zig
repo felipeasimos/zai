@@ -101,12 +101,20 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
                     },
                 };
                 new.data.weight_gradients.randomize(rand);
+                new.data.weights.randomize(rand);
+                new.data.input.randomize(rand);
+                new.data.preactivation.randomize(rand);
+                new.data.sigma.randomize(rand);
                 return new;
             }
             var new: @This() = .{
                 .data = .{},
             };
             new.data.weight_gradients.randomize(rand);
+            new.data.weights.randomize(rand);
+            new.data.input.randomize(rand);
+            new.data.preactivation.randomize(rand);
+            new.data.sigma.randomize(rand);
             return new;
         }
 
@@ -123,6 +131,12 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
         }
 
         pub fn layerBackprop(self: *@This(), guess: anytype, correct: anytype) dtype {
+            // update gradients by multiplying a^t and matrix multiplying by sigma
+            defer {
+                self.data.input
+                    .transpose(.{})
+                    .matmul(&self.data.sigma, &self.data.weight_gradients);
+            }
             var loss: dtype = 0;
             // sigma[i] = dL/dZ[i+1] = (sigma[i+1] @ W[i+1]) * dA[i+1]/dZ[i+1]
             // if i == o: sigma = -(y-ŷ) * dA[i+1]/dZ[i+1]
@@ -157,10 +171,7 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
                 }).func);
                 loss = self.data.next_layer.layerBackprop(guess, correct);
             }
-            // calculate weights gradient
-            self.data.input
-                .transpose(.{})
-                .matmul(&self.data.sigma, &self.data.weight_gradients);
+
             return loss;
         }
 
@@ -176,7 +187,7 @@ pub fn FullyConnectedLayer(comptime dtype: type, comptime options: FullyConnecte
         pub fn layerTrain(self: *@This(), params: TrainingParams(dtype)) void {
             self.data.weight_gradients.wise(params.learning_rate, &self.data.weight_gradients, (struct {
                 pub fn func(derivative: dtype, learning_rate: dtype) dtype {
-                    return derivative * learning_rate;
+                    return learning_rate * derivative;
                 }
             }).func);
             self.data.weights.wise(&self.data.weight_gradients, &self.data.weights, (struct {
