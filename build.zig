@@ -3,6 +3,7 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+
     const lib_mod = b.createModule(.{
         .root_source_file = b.path("src/zai.zig"),
         .target = target,
@@ -16,6 +17,7 @@ pub fn build(b: *std.Build) void {
     });
 
     exe_mod.addImport("zai", lib_mod);
+    exe_mod.addAnonymousImport("mnist-mini-csv", .{ .root_source_file = b.path("MNIST.csv") });
 
     const lib = b.addLibrary(.{
         .linkage = .static,
@@ -55,6 +57,7 @@ pub fn build(b: *std.Build) void {
 
     const contract = b.dependency("contract", .{});
     const tensor = b.dependency("tensor", .{});
+    const zcsv = b.dependency("zcsv", .{});
     const zglfw = b.dependency("zglfw", .{});
     const zgpu = b.dependency("zgpu", .{});
     const zgui = b.dependency("zgui", .{
@@ -65,6 +68,7 @@ pub fn build(b: *std.Build) void {
 
     lib.root_module.addImport("tensor", tensor.module("tensor"));
 
+    exe.root_module.addImport("zcsv", zcsv.module("zcsv"));
     exe.root_module.addImport("zglfw", zglfw.module("root"));
     exe.root_module.addImport("zgpu", zgpu.module("root"));
     exe.root_module.addImport("zgui", zgui.module("root"));

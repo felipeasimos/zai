@@ -5,11 +5,80 @@ const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zai = @import("zai");
+const zcsv = @import("zcsv");
+const Tensor = @import("tensor").Tensor;
+
+const mnist = @embedFile("mnist-mini-csv");
 
 const window_title = "zig-gamedev: minimal zgpu zgui";
 fn sigmoid(a: f32) f32 {
     const n = std.math.clamp(a, -500, 500);
     return 1 / (1 + std.math.exp(-n));
+}
+fn sigmoidPrime(a: f32) f32 {
+    const n = std.math.clamp(a, -500, 500);
+    return sigmoid(n) * (1 - sigmoid(n));
+}
+fn relu(a: f32) f32 {
+    return @max(a, 0);
+}
+fn reluPrime(a: f32) f32 {
+    return if (a > 0) 1 else 0;
+}
+
+fn train() !void {
+    const dtype = f32;
+    var parser = zcsv.zero_allocs.slice.init(mnist, .{});
+    const seed = 1337;
+    var prng = std.Random.DefaultPrng.init(blk: {
+        std.crypto.random.bytes(std.mem.asBytes(&seed));
+        break :blk seed;
+    });
+    var fully_connected_layer = zai.FullyConnectedLayer(f32, zai.FullyConnectedLayerOptions(f32){
+        .input_size = 64,
+        .output_size = 16,
+        .batch_size = 1797,
+        .activation = .{
+            .f = relu,
+            .prime = reluPrime,
+        },
+        .next_layer_type = zai.FullyConnectedLayer(f32, zai.FullyConnectedLayerOptions(f32){
+            .input_size = 16,
+            .output_size = 10,
+            .batch_size = 1797,
+            .activation = .{
+                .f = sigmoid,
+                .prime = sigmoidPrime,
+            },
+        }),
+    }).random(prng.random());
+
+    var x = Tensor(dtype, .{ 1797, 64 }){ .data = undefined };
+    var y = Tensor(dtype, .{ 1797, 10 }){ .data = undefined };
+    _ = parser.next(); // ignore header
+    var i: usize = 0;
+    while (parser.next()) |row| : (i += 1) {
+        var j: usize = 0;
+        var iter = row.iter();
+        while (iter.next()) |field| : (j += 1) {
+            const value: dtype = try std.fmt.parseFloat(dtype, field.raw());
+            if (j == 64) {
+                const value_idx = @as(usize, @intFromFloat(value));
+                y.scalar(.{ i, value_idx }).* = 1;
+            } else {
+                x.scalar(.{ i, j }).* = value;
+            }
+        }
+    }
+    var loss: f64 = 1;
+    i = 0;
+    while (loss > 1e-4) : (i += 1) {
+        @import("std").debug.print("i: {}, loss: {}\n", .{ i, loss });
+        loss = fully_connected_layer.train(&x, &y, .{
+            .learning_rate = 1e-3,
+            .random = prng.random(),
+        });
+    }
 }
 pub fn main() !void {
     try zglfw.init();
@@ -72,22 +141,7 @@ pub fn main() !void {
 
     zgui.getStyle().scaleAllSizes(scale_factor);
 
-    const fully_connected_layer = zai.FullyConnectedLayer(f32, zai.FullyConnectedLayerOptions(f32){
-        .input_size = 64,
-        .output_size = 10,
-        .batch_size = 2,
-        .activation = .{
-            .f = sigmoid,
-            .prime = (struct {
-                pub fn func(a: f32) f32 {
-                    const n = std.math.clamp(a, -500, 500);
-                    return sigmoid(n) * (1 - sigmoid(n));
-                }
-            }).func,
-        },
-        .next_layer_type = null,
-    }).init();
-    @import("std").debug.print("layer: {}\n", .{fully_connected_layer});
+    try train();
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
         zglfw.pollEvents();
